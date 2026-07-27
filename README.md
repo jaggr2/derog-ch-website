@@ -8,13 +8,7 @@ This domain is used for educational and personal purposes. It provides access to
 
 ## 📡 Services
 
-| Subdomain | Service | Description |
-|-----------|---------|-------------|
-| `ha.derog.ch` | Home Assistant | Smart home automation platform |
-| `kvm.derog.ch` | KVM / Proxmox | Virtualization lab |
-| `nas.derog.ch` | NAS | Network storage & backups |
-
-All services are accessible only through Cloudflare Tunnel + Access (authenticated).
+Services are discovered **dynamically** from Cloudflare DNS — add a proxied DNS record and it appears on the dashboard automatically.
 
 ## 🛡️ Proxy Whitelist
 
@@ -28,34 +22,43 @@ derog.ch
 www.derog.ch
 ```
 
-These subdomains are proxied through Cloudflare. Allow the [Cloudflare IP ranges](https://www.cloudflare.com/ips/) if you need to whitelist origin traffic.
+Allow the [Cloudflare IP ranges](https://www.cloudflare.com/ips/) if you need to whitelist origin traffic.
 
 ## 🏗️ Stack
 
 - **Hosting:** Cloudflare Pages
-- **Status API:** Cloudflare Pages Function (Worker)
-- **Auth:** Cloudflare Access with Service Auth
+- **Status API:** Pages Function (Worker) — calls Cloudflare API to discover records + health
 - **Tunnel:** Cloudflare Tunnel (cloudflared)
+- **Auth:** Cloudflare Access
 - **Frontend:** Vanilla HTML + Tailwind CSS (CDN)
 
 ## 🚀 Deployment
 
 Push to `main` — Cloudflare Pages auto-deploys.
 
-### Required environment variables (Cloudflare Pages):
+### Required environment variables
 
-| Variable | Description |
-|----------|-------------|
-| `SERVICES` | JSON array of services: `[{"name":"Home Assistant","subdomain":"ha","url":"https://ha.derog.ch/"}, ...]` |
-| `CF_ACCESS_CLIENT_ID` | Cloudflare Access Service Token Client ID |
-| `CF_ACCESS_CLIENT_SECRET` | Cloudflare Access Service Token Client Secret |
+| Variable | Description | Required permissions |
+|----------|-------------|---------------------|
+| `CLOUDFLARE_API_TOKEN` | Cloudflare API token | `Zone:Read`, `DNS:Read`, `Account:Tunnel:Read` (tunnel status optional) |
 
-### Cloudflare Access Setup
+### Creating the API token
 
-1. Go to Zero Trust → Access → Service Auth → Create Service Token
-2. Note the Client ID and Client Secret
-3. For each application (ha, kvm, nas), add a policy that allows this service token
-4. Add the service token env vars to Cloudflare Pages
+1. Go to Cloudflare Dashboard → My Profile → API Tokens → Create Token
+2. Use the "Custom token" template
+3. Add permissions:
+   - `Zone` → `Read` for `derog.ch`
+   - `DNS` → `Read` for `derog.ch`
+   - `Account` → `Tunnel` → `Read` (optional — adds tunnel health to the dashboard)
+4. Copy the token and add it as `CLOUDFLARE_API_TOKEN` in Pages → Settings → Environment variables
+
+### Cloudflare Pages setup
+
+1. Go to Workers & Pages → Create → Pages → Connect to Git
+2. Select `jaggr2/derog-ch-website`
+3. Build settings: Framework = **None**, Build command = *(empty)*, Build output = `/`
+4. Set the environment variable above
+5. Deploy and set custom domain → `derog.ch`
 
 ## 📄 License
 

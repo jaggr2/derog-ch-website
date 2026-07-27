@@ -53,9 +53,6 @@
     .badge { background: linear-gradient(135deg, rgba(167, 139, 250, 0.15), rgba(232, 121, 249, 0.15)); border: 1px solid rgba(167, 139, 250, 0.3); backdrop-filter: blur(10px); }
     .service-icon { font-size: 1.5rem; }
     .fade-in { animation: fadeInUp 0.6s ease-out both; }
-    .fade-in:nth-child(1) { animation-delay: 0.1s; }
-    .fade-in:nth-child(2) { animation-delay: 0.2s; }
-    .fade-in:nth-child(3) { animation-delay: 0.3s; }
     ::selection { background: rgba(167, 139, 250, 0.3); }
   </style>
 </head>
@@ -77,12 +74,16 @@
       </p>
     </div>
 
+    <div id="tunnel-status" class="mb-6 text-center text-xs text-purple-300/40 fade-in"></div>
+
     <div id="services" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 w-full max-w-4xl fade-in">
     </div>
 
+    <div id="error" class="mt-8 text-center text-red-400/60 text-sm hidden"></div>
+
     <div class="mt-8 text-center">
-      <button onclick="window.location.reload()" class="px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-sm text-purple-300/50 hover:text-purple-300/80 transition-all duration-200">
-        ↻ refresh status
+      <button onclick="location.reload()" class="px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-sm text-purple-300/50 hover:text-purple-300/80 transition-all duration-200">
+        ↻ refresh
       </button>
     </div>
   </main>
@@ -93,70 +94,110 @@
   </footer>
 
   <script>
-    const services = [
-      { name: 'Home Assistant', subdomain: 'ha', url: 'https://ha.derog.ch/', icon: '🏠', desc: 'Smart home automation' },
-      { name: 'KVM', subdomain: 'kvm', url: 'https://kvm.derog.ch/', icon: '💻', desc: 'Virtualization & lab' },
-      { name: 'NAS', subdomain: 'nas', url: 'https://nas.derog.ch/', icon: '💾', desc: 'Network storage & backups' },
-    ];
+    const KNOWN = {
+      ha:  { icon: '🏠', name: 'Home Assistant', desc: 'Smart home automation' },
+      nas: { icon: '💾', name: 'NAS', desc: 'Network storage & backups' },
+      kvm: { icon: '💻', name: 'KVM', desc: 'Virtualization & lab' },
+    };
+    const FALLBACK = { icon: '🔗', name: null, desc: null };
 
     const container = document.getElementById('services');
+    const errorEl = document.getElementById('error');
+    const tunnelEl = document.getElementById('tunnel-status');
 
     function createCard(svc) {
+      const known = KNOWN[svc.subdomain] || FALLBACK;
+      const name = known.name || svc.subdomain;
       const card = document.createElement('div');
       card.className = 'card rounded-xl p-5 fade-in';
+      card.style.animationDelay = '0.1s';
       card.innerHTML = `
         <div class="flex items-start justify-between mb-3">
           <div class="flex items-center gap-3">
-            <span class="service-icon">${svc.icon}</span>
+            <span class="service-icon">${known.icon}</span>
             <div>
-              <h3 class="font-semibold text-sm">${svc.name}</h3>
-              <p class="text-xs text-purple-300/50">${svc.desc}</p>
+              <h3 class="font-semibold text-sm">${name}</h3>
+              ${known.desc ? `<p class="text-xs text-purple-300/50">${known.desc}</p>` : ''}
             </div>
           </div>
-          <span class="status-dot checking" data-status="${svc.subdomain}"></span>
+          <span class="status-dot checking" data-svc="${svc.subdomain}"></span>
         </div>
         <a href="${svc.url}" target="_blank" rel="noopener noreferrer" class="text-xs text-purple-400/60 hover:text-purple-300/90 transition-colors font-mono">
-          ${svc.subdomain}.derog.ch ↗
+          ${svc.subdomain === '@' ? 'derog.ch' : svc.subdomain + '.derog.ch'} ↗
         </a>
-        <div class="mt-2 text-xs" data-latency="${svc.subdomain}"></div>
+        <div class="mt-2 text-xs text-purple-300/50" data-latency="${svc.subdomain}"></div>
       `;
       return card;
     }
 
-    services.forEach(svc => container.appendChild(createCard(svc)));
+    async function load() {
+      container.innerHTML = '';
+      errorEl.classList.add('hidden');
+      tunnelEl.textContent = '';
 
-    async function checkStatus() {
       try {
         const res = await fetch('/api/status');
-        if (!res.ok) throw new Error('Status API unavailable');
+        if (!res.ok) throw new Error('API returned ' + res.status);
         const data = await res.json();
 
-        data.services.forEach(svc => {
-          const dot = document.querySelector(`[data-status="${svc.subdomain}"]`);
-          const latEl = document.querySelector(`[data-latency="${svc.subdomain}"]`);
+        if (data.tunnels) {
+          const states = Object.values(data.tunnels);
+          const healthy = states.filter(s => s === 'healthy').length;
+          const total = states.length;
+          const icon = states.every(s => s === 'healthy') ? '🟢' : states.some(s => s === 'healthy') ? '🟡' : '🔴';
+          tunnelEl.textContent = `${icon} tunnel${total > 1 ? 's' : ''}: ${healthy}/${total} healthy`;
+        }
+
+        if (!data.services || data.services.length === 0) {
+          container.innerHTML = '<div class="col-span-full text-center text-purple-300/40 text-sm">no proxied services found yet</div>';
+          return;
+        }
+
+        data.services.forEach((svc, i) => {
+          const card = createCard(svc);
+          card.style.animationDelay = `${0.1 + i * 0.08}s`;
+          container.appendChild(card);
+
+          const dot = card.querySelector('[data-svc]');
+          const latEl = card.querySelector('[data-latency]');
           if (dot) {
             dot.className = `status-dot ${svc.status === 'online' ? 'online' : 'offline'}`;
-            dot.title = svc.status === 'online' ? 'Online' : 'Offline';
+            dot.title = svc.status;
           }
           if (latEl) {
-            if (svc.status === 'online' && svc.latency) {
+            if (svc.status === 'online' && svc.latency != null) {
               latEl.textContent = `${svc.latency}ms`;
-              latEl.className = 'mt-2 text-xs text-purple-300/50';
             } else if (svc.status === 'offline') {
               latEl.textContent = 'unreachable';
               latEl.className = 'mt-2 text-xs text-red-400/50';
             }
           }
         });
-      } catch {
-        document.querySelectorAll('.status-dot').forEach(d => {
-          d.className = 'status-dot offline';
+
+        data.services.forEach((svc) => {
+          const dot = document.querySelector(`[data-svc="${svc.subdomain}"]`);
+          const latEl = document.querySelector(`[data-latency="${svc.subdomain}"]`);
+          if (dot) {
+            dot.className = `status-dot ${svc.status === 'online' ? 'online' : 'offline'}`;
+            dot.title = svc.status;
+          }
+          if (latEl) {
+            if (svc.status === 'online' && svc.latency != null) {
+              latEl.textContent = `${svc.latency}ms`;
+            } else if (svc.status === 'offline') {
+              latEl.textContent = 'unreachable';
+              latEl.className = 'mt-2 text-xs text-red-400/50';
+            }
+          }
         });
+      } catch (e) {
+        errorEl.textContent = '⚠ could not reach status API — services may be offline';
+        errorEl.classList.remove('hidden');
       }
     }
 
-    checkStatus();
-    setInterval(checkStatus, 60000);
+    load();
+    setInterval(load, 60000);
   </script>
 </body>
 </html>
