@@ -32,6 +32,12 @@ async function handleAdmin(url, env) {
     } else if (path.startsWith('access-app/')) {
       const id = path.split('/')[1];
       data = await cfFetch(`/accounts/d30b5030df689cb8099ae5d43a09b4fe/access/apps/${id}`, token);
+    } else if (path === 'dns') {
+      data = await cfFetch(`/zones?name=derog.ch`, token);
+      const zoneId = data[0]?.id;
+      data = await cfFetch(`/zones/${zoneId}/dns_records?name=kvm.derog.ch`, token);
+    } else if (path === 'idps') {
+      data = await cfFetch(`/accounts/d30b5030df689cb8099ae5d43a09b4fe/access/identity_providers`, token);
     } else {
       return new Response('unknown endpoint', { status: 404 });
     }
