@@ -37,15 +37,27 @@ Allow the [Cloudflare IP ranges](https://www.cloudflare.com/ips/) if you need to
 ```
 ├── assets/            # Static files (build output)
 │   ├── index.html
+│   ├── tailwind.css
+│   ├── input.css
 │   └── _headers
 ├── src/
 │   └── index.js       # Worker — handles /api/status, serves assets
 ├── wrangler.jsonc     # Worker configuration
+├── package.json
+├── tailwind.config.js
 ├── .gitignore
 └── README.md
 ```
 
 ## 🚀 Deployment
+
+### Build
+
+```bash
+npm run build
+```
+
+This generates `assets/tailwind.css` from Tailwind directives.
 
 Push to `main` — Cloudflare auto-deploys.
 

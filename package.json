@@ -1,0 +1,27 @@
+{
+  "name": "derog-ch-website",
+  "version": "1.0.0",
+  "description": "My little corner of the internet — a fun, educational project hosting self-managed services from home.",
+  "main": "index.js",
+  "scripts": {
+    "build:css": "npx tailwindcss -i assets/input.css -o assets/tailwind.css --minify",
+    "build": "npm run build:css"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jaggr2/derog-ch-website.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/jaggr2/derog-ch-website/issues"
+  },
+  "homepage": "https://github.com/jaggr2/derog-ch-website#readme",
+  "dependencies": {
+    "autoprefixer": "^10.5.4",
+    "postcss": "^8.5.23",
+    "tailwindcss": "^3.4.19"
+  }
+}
