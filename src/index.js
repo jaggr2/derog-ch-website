@@ -11,7 +11,7 @@ async function cfFetch(path, token) {
 }
 
 export default {
-  async fetch(request, env, ctx) {
+  async fetch(request, env) {
     const url = new URL(request.url);
 
     if (url.pathname === '/api/status') {
@@ -49,11 +49,22 @@ async function handleStatus(env) {
     const dnsRecords = records.status === 'fulfilled' ? records.value : [];
     const tunnelList = tunnels.status === 'fulfilled' ? tunnels.value : [];
 
-    const tunnelById = {};
-    const tunnelByNameStripped = {};
-    for (const t of tunnelList) {
-      tunnelById[t.id] = t;
-      tunnelByNameStripped[t.name.toLowerCase().replace(/[^a-z]/g, '')] = t.status;
+    const tunnelConfigs = await Promise.allSettled(
+      tunnelList.map((t) =>
+        cfFetch(`/accounts/${accountId}/cfd_tunnel/${t.id}/configurations`, token).catch(() => null)
+      )
+    );
+
+    const hostnameToTunnelStatus = {};
+    for (let i = 0; i < tunnelList.length; i++) {
+      const cfg = tunnelConfigs[i];
+      if (cfg.status !== 'fulfilled' || !cfg.value) continue;
+      const ingress = cfg.value.ingress || [];
+      for (const rule of ingress) {
+        if (rule.hostname) {
+          hostnameToTunnelStatus[rule.hostname] = tunnelList[i].status;
+        }
+      }
     }
 
     const proxiedSubdomains = dnsRecords.filter((r) => r.name !== 'derog.ch');
@@ -63,16 +74,7 @@ async function handleStatus(env) {
         const subdomain = rec.name.replace('.derog.ch', '');
         const url = `https://${rec.name}/`;
 
-        let tunnelStatus = null;
-        if (rec.content && rec.content.includes('.cfargotunnel.com')) {
-          const tid = rec.content.split('.')[0];
-          const t = tunnelById[tid];
-          if (t) tunnelStatus = t.status;
-        }
-        if (!tunnelStatus) {
-          const key = Object.keys(tunnelByNameStripped).find(k => k.includes(subdomain));
-          if (key) tunnelStatus = tunnelByNameStripped[key];
-        }
+        const tunnelStatus = hostnameToTunnelStatus[rec.name] || null;
 
         let status = 'unknown';
         let statusCode = null;
@@ -104,11 +106,11 @@ async function handleStatus(env) {
     );
 
     const services = serviceResults.map((r) => (r.status === 'fulfilled' ? r.value : null)).filter(Boolean);
-    const tunnelStatus = tunnelList.length > 0
+    const tunnelSummaries = tunnelList.length > 0
       ? tunnelList.reduce((acc, t) => { acc[t.name] = t.status; return acc; }, {})
       : null;
 
-    return new Response(JSON.stringify({ services, tunnels: tunnelStatus, timestamp: new Date().toISOString() }), {
+    return new Response(JSON.stringify({ services, tunnels: tunnelSummaries, timestamp: new Date().toISOString() }), {
       headers: {
         'Content-Type': 'application/json',
         'Cache-Control': 'public, max-age=30, s-maxage=30',
