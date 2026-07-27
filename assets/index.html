@@ -76,10 +76,6 @@
     <div id="last-refreshed" class="mb-6 text-center text-xs text-purple-300/30 fade-in"></div>
 
     <div id="services" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 w-full max-w-4xl fade-in">
-      <div id="loading" class="col-span-full flex flex-col items-center gap-3 py-12">
-        <div class="w-6 h-6 border-2 border-purple-400/30 border-t-purple-400 rounded-full animate-spin"></div>
-        <span class="text-xs text-purple-300/40">loading services...</span>
-      </div>
     </div>
 
     <div id="error" class="mt-8 text-center text-red-400/60 text-sm hidden"></div>
@@ -135,11 +131,14 @@
       return card;
     }
 
+    function showLoading() {
+      container.innerHTML = '<div id="loading" class="col-span-full flex flex-col items-center gap-3 py-12"><div class="w-6 h-6 border-2 border-purple-400/30 border-t-purple-400 rounded-full animate-spin"></div><span class="text-xs text-purple-300/40">loading services...</span></div>';
+    }
+
     async function load() {
-      container.innerHTML = '';
+      showLoading();
       tunnelEl.textContent = '';
       errorEl.classList.add('hidden');
-      const loading = document.getElementById('loading');
 
       try {
         const res = await fetch('/api/status');
@@ -154,7 +153,6 @@
           tunnelEl.textContent = `${icon} tunnel${total > 1 ? 's' : ''}: ${healthy}/${total} healthy`;
         }
 
-        if (loading) loading.remove();
         lastRefresh = Date.now();
         updateRefreshTime();
 
@@ -184,7 +182,6 @@
           }
         });
       } catch (e) {
-        if (loading) loading.remove();
         errorEl.textContent = '⚠ could not reach status API — services may be offline';
         errorEl.classList.remove('hidden');
       }
