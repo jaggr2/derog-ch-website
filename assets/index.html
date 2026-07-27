@@ -150,7 +150,7 @@
         lastRefresh = Date.now();
         updateRefreshTime();
 
-        container.innerHTML = '';
+        container.innerHTML = '<div class="col-span-full text-xs text-purple-300/40 mb-3 font-medium uppercase tracking-wider">Services</div>';
 
         if (!data.services || data.services.length === 0) {
           container.innerHTML = '<div class="col-span-full text-center text-purple-300/40 text-sm">no proxied services found yet</div>';
