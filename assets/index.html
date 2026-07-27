@@ -72,10 +72,12 @@
 
     </div>
 
-    <div id="tunnel-status" class="mb-6 text-center text-xs text-purple-300/40 fade-in"></div>
     <div id="last-refreshed" class="mb-6 text-center text-xs text-purple-300/30 fade-in"></div>
 
     <div id="services" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 w-full max-w-4xl fade-in">
+    </div>
+
+    <div id="tunnels" class="mt-8 w-full max-w-4xl fade-in">
     </div>
 
     <div id="error" class="mt-8 text-center text-red-400/60 text-sm hidden"></div>
@@ -101,8 +103,8 @@
     const FALLBACK = { icon: '🔗', name: null, desc: null };
 
     const container = document.getElementById('services');
+    const tunnelContainer = document.getElementById('tunnels');
     const errorEl = document.getElementById('error');
-    const tunnelEl = document.getElementById('tunnel-status');
     const refreshEl = document.getElementById('last-refreshed');
     let lastRefresh = null;
 
@@ -137,21 +139,13 @@
 
     async function load() {
       showLoading();
-      tunnelEl.textContent = '';
+      tunnelContainer.innerHTML = '';
       errorEl.classList.add('hidden');
 
       try {
         const res = await fetch('/api/status');
         if (!res.ok) throw new Error('API returned ' + res.status);
         const data = await res.json();
-
-        if (data.tunnels) {
-          const states = Object.values(data.tunnels);
-          const healthy = states.filter(s => s === 'healthy').length;
-          const total = states.length;
-          const icon = states.every(s => s === 'healthy') ? '🟢' : states.some(s => s === 'healthy') ? '🟡' : '🔴';
-          tunnelEl.textContent = `${icon} tunnel${total > 1 ? 's' : ''}: ${healthy}/${total} healthy`;
-        }
 
         lastRefresh = Date.now();
         updateRefreshTime();
@@ -183,6 +177,23 @@
             }
           }
         });
+
+        if (data.tunnels) {
+          const entries = Object.entries(data.tunnels);
+          if (entries.length > 0) {
+            tunnelContainer.innerHTML = entries.map(([name, status]) => {
+              const lamp = status === 'healthy' ? 'online' : status === 'degraded' ? 'checking' : 'offline';
+              return `<div class="card rounded-lg px-4 py-2.5 flex items-center justify-between mb-2">
+                <span class="text-xs text-purple-300/70 font-mono">${name}</span>
+                <span class="flex items-center gap-2">
+                  <span class="status-dot ${lamp}"></span>
+                  <span class="text-xs text-purple-300/50">${status}</span>
+                </span>
+              </div>`;
+            }).join('');
+            tunnelContainer.innerHTML = `<div class="text-xs text-purple-300/40 mb-3 font-medium uppercase tracking-wider">Tunnels</div>` + tunnelContainer.innerHTML;
+          }
+        }
       } catch (e) {
         errorEl.textContent = '⚠ could not reach status API — services may be offline';
         errorEl.classList.remove('hidden');
