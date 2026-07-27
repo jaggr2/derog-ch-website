@@ -59,6 +59,14 @@ npm run build
 
 This generates `assets/tailwind.css` from Tailwind directives.
 
+### Cloudflare Pages build settings
+
+| Setting | Value |
+|---------|-------|
+| Build command | `npm run build` |
+| Deploy command | `npx wrangler deploy` |
+| Root directory | `/` |
+
 Push to `main` — Cloudflare auto-deploys.
 
 ### Required environment variable
