@@ -73,6 +73,7 @@
     </div>
 
     <div id="tunnel-status" class="mb-6 text-center text-xs text-purple-300/40 fade-in"></div>
+    <div id="last-refreshed" class="mb-6 text-center text-xs text-purple-300/30 fade-in"></div>
 
     <div id="services" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 w-full max-w-4xl fade-in">
       <div id="loading" class="col-span-full flex flex-col items-center gap-3 py-12">
@@ -106,6 +107,8 @@
     const container = document.getElementById('services');
     const errorEl = document.getElementById('error');
     const tunnelEl = document.getElementById('tunnel-status');
+    const refreshEl = document.getElementById('last-refreshed');
+    let lastRefresh = null;
 
     function createCard(svc) {
       const known = KNOWN[svc.subdomain] || FALLBACK;
@@ -152,6 +155,8 @@
         }
 
         if (loading) loading.remove();
+        lastRefresh = Date.now();
+        updateRefreshTime();
 
         if (!data.services || data.services.length === 0) {
           container.innerHTML = '<div class="col-span-full text-center text-purple-300/40 text-sm">no proxied services found yet</div>';
@@ -185,8 +190,16 @@
       }
     }
 
+    function updateRefreshTime() {
+      if (!lastRefresh) { refreshEl.textContent = ''; return; }
+      const sec = Math.floor((Date.now() - lastRefresh) / 1000);
+      if (sec < 60) refreshEl.textContent = `last refreshed ${sec}s ago`;
+      else refreshEl.textContent = `last refreshed ${Math.floor(sec / 60)}min ${sec % 60}s ago`;
+    }
+
     load();
     setInterval(load, 60000);
+    setInterval(updateRefreshTime, 10000);
   </script>
 </body>
 </html>
