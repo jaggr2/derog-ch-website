@@ -81,7 +81,7 @@ async function handleStatus(env) {
           const res = await fetch(url, { method: 'HEAD', signal: AbortSignal.timeout(8000), redirect: 'manual' });
           statusCode = res.status;
           latency = Date.now() - start;
-          httpOk = res.status < 500;
+          httpOk = res.status >= 200 && res.status < 400;
         } catch {}
 
         // 4. Determine final status: tunnel state takes precedence, HTTP refines it
