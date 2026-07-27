@@ -1,7 +1,5 @@
 const CF_API = 'https://api.cloudflare.com/client/v4';
 
-let accessId = '', accessSecret = '';
-
 async function cfFetch(path, token) {
   const res = await fetch(`${CF_API}${path}`, {
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -29,8 +27,8 @@ async function handleStatus(env) {
     });
   }
 
-  accessId = env.CF_ACCESS_CLIENT_ID || '';
-  accessSecret = env.CF_ACCESS_CLIENT_SECRET || '';
+  const accessId = env.CF_ACCESS_CLIENT_ID || '';
+  const accessSecret = env.CF_ACCESS_CLIENT_SECRET || '';
 
   try {
     const zones = await cfFetch('/zones?name=derog.ch', token);
