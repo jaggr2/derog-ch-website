@@ -32,6 +32,19 @@ Allow the [Cloudflare IP ranges](https://www.cloudflare.com/ips/) if you need to
 - **Auth:** Cloudflare Access
 - **Frontend:** Vanilla HTML + Tailwind CSS (CDN)
 
+## 📁 Repo structure
+
+```
+├── public/                # Static assets (build output)
+│   ├── index.html
+│   └── _headers
+├── functions/             # Pages Functions (server-side)
+│   └── api/
+│       └── status.js      # GET /api/status
+├── .gitignore
+└── README.md
+```
+
 ## 🚀 Deployment
 
 Push to `main` — Cloudflare Pages auto-deploys.
@@ -56,9 +69,19 @@ Push to `main` — Cloudflare Pages auto-deploys.
 
 1. Go to Workers & Pages → Create → Pages → Connect to Git
 2. Select `jaggr2/derog-ch-website`
-3. Build settings: Framework = **None**, Build command = *(empty)*, Build output = `/`
+3. Build settings: Framework = **None**, Build command = *(empty)*, Build output = `public`
 4. Set the environment variable above
 5. Deploy and set custom domain → `derog.ch`
+
+### Optional: www → root redirect
+
+The `_redirects` file was removed because Cloudflare Pages doesn't support absolute URLs there. To redirect `www.derog.ch` to `derog.ch`, create a **Redirect Rule** in Cloudflare dashboard:
+
+1. Go to `derog.ch` → Rules → Redirect Rules
+2. Create a redirect rule:
+   - **When:** Hostname equals `www.derog.ch`
+   - **Then:** `https://derog.ch` (dynamic, preserve path)
+   - **Status:** 301
 
 ## 📄 License
 
