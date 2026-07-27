@@ -55,9 +55,20 @@ Push to `main` — Cloudflare auto-deploys.
 |----------|-------------|
 | `CLOUDFLARE_API_TOKEN` | Cloudflare API token with `Zone:Read`, `DNS:Read`, `Cloudflare Tunnel:Read` (optional) |
 
+### Optional: Access Service Token (for real service health checks)
+
+Without this, the Worker only checks if the tunnel responds (getting a 302 from Cloudflare Access counts as "online"). To actually probe the service behind Access, add a Service Token:
+
+| Variable | Description |
+|----------|-------------|
+| `CF_ACCESS_CLIENT_ID` | Cloudflare Access Service Token Client ID |
+| `CF_ACCESS_CLIENT_SECRET` | Cloudflare Access Service Token Client Secret |
+
+Create the token in Zero Trust → Access → Service Auth, then add a policy on each app allowing it.
+
 ### Setting up
 
-1. **Add the API token:** In Cloudflare dashboard → Workers & Pages → `derog-ch-website` → Settings → **Variables** → Add `CLOUDFLARE_API_TOKEN`
+1. **Add env vars:** In Cloudflare dashboard → Workers & Pages → `derog-ch-website` → Settings → **Variables** → Add `CLOUDFLARE_API_TOKEN` (and optionally `CF_ACCESS_CLIENT_ID` + `CF_ACCESS_CLIENT_SECRET`)
 2. **Set custom domain:** In the project → **Settings** → **Domains & Routes** → Add `derog.ch`
 3. **(Optional) www redirect:** Go to Rules → Redirect Rules → create rule: hostname `www.derog.ch` → `https://derog.ch` (301)
 

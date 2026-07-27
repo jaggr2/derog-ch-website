@@ -18,8 +18,11 @@ async function handleStatus(env) {
     });
   }
 
+  const accessId = env.CF_ACCESS_CLIENT_ID || '';
+  const accessSecret = env.CF_ACCESS_CLIENT_SECRET || '';
+
   try {
-    const zones = await cfFetch(`/zones?name=derog.ch`, token);
+    const zones = await cfFetch('/zones?name=derog.ch', token);
     if (!zones.length) throw new Error('Zone derog.ch not found');
     const zone = zones[0];
     const zoneId = zone.id;
@@ -33,16 +36,23 @@ async function handleStatus(env) {
     const dnsRecords = records.status === 'fulfilled' ? records.value : [];
     const tunnelList = tunnels.status === 'fulfilled' ? tunnels.value : [];
 
+    const proxiedSubdomains = dnsRecords.filter((r) => r.name !== 'derog.ch');
+
     const serviceResults = await Promise.allSettled(
-      dnsRecords.map(async (rec) => {
+      proxiedSubdomains.map(async (rec) => {
         const subdomain = rec.name.replace('.derog.ch', '');
         const url = `https://${rec.name}/`;
         const start = Date.now();
+        const headers = {};
+        if (accessId && accessSecret) {
+          headers['CF-Access-Client-Id'] = accessId;
+          headers['CF-Access-Client-Secret'] = accessSecret;
+        }
         try {
-          await fetch(url, { method: 'HEAD', signal: AbortSignal.timeout(8000), redirect: 'manual' });
-          return { name: rec.name, subdomain: subdomain || '@', url, type: rec.type, status: 'online', latency: Date.now() - start, proxied: rec.proxied };
+          await fetch(url, { method: 'GET', headers, signal: AbortSignal.timeout(8000), redirect: 'manual' });
+          return { name: rec.name, subdomain, url, type: rec.type, status: 'online', latency: Date.now() - start, proxied: rec.proxied };
         } catch {
-          return { name: rec.name, subdomain: subdomain || '@', url, type: rec.type, status: 'offline', latency: null, proxied: rec.proxied };
+          return { name: rec.name, subdomain, url, type: rec.type, status: 'offline', latency: null, proxied: rec.proxied };
         }
       })
     );

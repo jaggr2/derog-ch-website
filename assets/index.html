@@ -133,9 +133,10 @@
     }
 
     async function load() {
-      const loading = document.getElementById('loading');
-      errorEl.classList.add('hidden');
+      container.innerHTML = '';
       tunnelEl.textContent = '';
+      errorEl.classList.add('hidden');
+      const loading = document.getElementById('loading');
 
       try {
         const res = await fetch('/api/status');
@@ -164,23 +165,6 @@
 
           const dot = card.querySelector('[data-svc]');
           const latEl = card.querySelector('[data-latency]');
-          if (dot) {
-            dot.className = `status-dot ${svc.status === 'online' ? 'online' : 'offline'}`;
-            dot.title = svc.status;
-          }
-          if (latEl) {
-            if (svc.status === 'online' && svc.latency != null) {
-              latEl.textContent = `${svc.latency}ms`;
-            } else if (svc.status === 'offline') {
-              latEl.textContent = 'unreachable';
-              latEl.className = 'mt-2 text-xs text-red-400/50';
-            }
-          }
-        });
-
-        data.services.forEach((svc) => {
-          const dot = document.querySelector(`[data-svc="${svc.subdomain}"]`);
-          const latEl = document.querySelector(`[data-latency="${svc.subdomain}"]`);
           if (dot) {
             dot.className = `status-dot ${svc.status === 'online' ? 'online' : 'offline'}`;
             dot.title = svc.status;
