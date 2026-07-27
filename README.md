@@ -30,7 +30,11 @@ Allow the [Cloudflare IP ranges](https://www.cloudflare.com/ips/) if you need to
 - **Status API:** Worker (src/index.js) — calls Cloudflare API to discover records + health
 - **Tunnel:** Cloudflare Tunnel (cloudflared)
 - **Auth:** Cloudflare Access
-- **Frontend:** Vanilla HTML + Tailwind CSS (CDN)
+- **Frontend:** Vanilla HTML + Tailwind CSS (self-hosted, built via npm)
+- **CSS build:** Tailwind CLI (scan HTML classes, output minified CSS)
+- **Service discovery:** Dynamic via Cloudflare DNS API (no static config needed)
+- **Health checks:** HTTP GET to each subdomain, 5xx treated as offline
+- **Auth (optional):** Access Service Token for behind-Access health probes
 
 ## 📁 Repo structure
 
@@ -51,7 +55,15 @@ Allow the [Cloudflare IP ranges](https://www.cloudflare.com/ips/) if you need to
 
 ## 🚀 Deployment
 
-### Build
+### Architecture decisions
+
+- **Workers + Static Assets** was chosen over Pages Functions because env vars require actual Worker code, not just static files.
+- **No static service config** — the Worker queries the Cloudflare DNS API for all proxied records and checks each one.
+- **Access Service Token is optional** — without it, the Worker treats any non-5xx response (including Access login redirects) as "online".
+- **5xx = offline** — HTTP 502/503 from the tunnel means the service behind it is down.
+- **Tailwind is self-hosted** — run `npm run build` to scan HTML classes and produce a minified CSS file.
+
+### Build locally
 
 ```bash
 npm run build
@@ -59,7 +71,7 @@ npm run build
 
 This generates `assets/tailwind.css` from Tailwind directives.
 
-### Cloudflare Pages build settings
+### Cloudflare build settings (auto-configured)
 
 | Setting | Value |
 |---------|-------|
