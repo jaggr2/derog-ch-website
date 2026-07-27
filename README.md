@@ -40,7 +40,7 @@ Push to `main` — Cloudflare Pages auto-deploys.
 
 | Variable | Description | Required permissions |
 |----------|-------------|---------------------|
-| `CLOUDFLARE_API_TOKEN` | Cloudflare API token | `Zone:Read`, `DNS:Read`, `Account:Tunnel:Read` (tunnel status optional) |
+| `CLOUDFLARE_API_TOKEN` | Cloudflare API token | `Zone:Read`, `DNS:Read`, `Cloudflare Tunnel:Read` (tunnel status optional) |
 
 ### Creating the API token
 
@@ -49,7 +49,7 @@ Push to `main` — Cloudflare Pages auto-deploys.
 3. Add permissions:
    - `Zone` → `Read` for `derog.ch`
    - `DNS` → `Read` for `derog.ch`
-   - `Account` → `Tunnel` → `Read` (optional — adds tunnel health to the dashboard)
+   - `Cloudflare Tunnel` → `Read` (optional — adds tunnel health to the dashboard, found under Account permissions)
 4. Copy the token and add it as `CLOUDFLARE_API_TOKEN` in Pages → Settings → Environment variables
 
 ### Cloudflare Pages setup
