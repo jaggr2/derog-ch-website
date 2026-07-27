@@ -49,9 +49,11 @@ async function handleStatus(env) {
     const dnsRecords = records.status === 'fulfilled' ? records.value : [];
     const tunnelList = tunnels.status === 'fulfilled' ? tunnels.value : [];
 
-    const tunnelStatusMap = {};
+    const tunnelById = {};
+    const tunnelByNameStripped = {};
     for (const t of tunnelList) {
-      tunnelStatusMap[t.name.toLowerCase().replace(/[^a-z]/g, '')] = t.status;
+      tunnelById[t.id] = t;
+      tunnelByNameStripped[t.name.toLowerCase().replace(/[^a-z]/g, '')] = t.status;
     }
 
     const proxiedSubdomains = dnsRecords.filter((r) => r.name !== 'derog.ch');
@@ -62,8 +64,15 @@ async function handleStatus(env) {
         const url = `https://${rec.name}/`;
 
         let tunnelStatus = null;
-        const key = Object.keys(tunnelStatusMap).find(k => k.includes(subdomain));
-        if (key) tunnelStatus = tunnelStatusMap[key];
+        if (rec.content && rec.content.includes('.cfargotunnel.com')) {
+          const tid = rec.content.split('.')[0];
+          const t = tunnelById[tid];
+          if (t) tunnelStatus = t.status;
+        }
+        if (!tunnelStatus) {
+          const key = Object.keys(tunnelByNameStripped).find(k => k.includes(subdomain));
+          if (key) tunnelStatus = tunnelByNameStripped[key];
+        }
 
         let status = 'unknown';
         let statusCode = null;
