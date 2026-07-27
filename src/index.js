@@ -49,10 +49,11 @@ async function handleStatus(env) {
           headers['CF-Access-Client-Secret'] = accessSecret;
         }
         try {
-          await fetch(url, { method: 'GET', headers, signal: AbortSignal.timeout(8000), redirect: 'manual' });
-          return { name: rec.name, subdomain, url, type: rec.type, status: 'online', latency: Date.now() - start, proxied: rec.proxied };
+          const res = await fetch(url, { method: 'GET', headers, signal: AbortSignal.timeout(8000), redirect: 'manual' });
+          const status = res.status < 500 ? 'online' : 'offline';
+          return { name: rec.name, subdomain, url, type: rec.type, status, statusCode: res.status, latency: Date.now() - start, proxied: rec.proxied };
         } catch {
-          return { name: rec.name, subdomain, url, type: rec.type, status: 'offline', latency: null, proxied: rec.proxied };
+          return { name: rec.name, subdomain, url, type: rec.type, status: 'offline', statusCode: null, latency: null, proxied: rec.proxied };
         }
       })
     );
