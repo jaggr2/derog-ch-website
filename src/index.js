@@ -10,6 +10,22 @@ async function cfFetch(path, token) {
   return body.result;
 }
 
+export default {
+  async fetch(request, env, ctx) {
+    const url = new URL(request.url);
+
+    if (url.pathname === '/api/status') {
+      return handleStatus(env);
+    }
+
+    if (!env.ASSETS) {
+      return new Response('Not Found', { status: 404 });
+    }
+
+    return env.ASSETS.fetch(request);
+  },
+};
+
 async function handleStatus(env) {
   const token = env.CLOUDFLARE_API_TOKEN;
   if (!token) {
@@ -17,9 +33,6 @@ async function handleStatus(env) {
       status: 500, headers: { 'Content-Type': 'application/json' },
     });
   }
-
-  const accessId = env.CF_ACCESS_CLIENT_ID || '';
-  const accessSecret = env.CF_ACCESS_CLIENT_SECRET || '';
 
   try {
     const zones = await cfFetch('/zones?name=derog.ch', token);
@@ -29,12 +42,17 @@ async function handleStatus(env) {
     const accountId = zone.account.id;
 
     const [records, tunnels] = await Promise.allSettled([
-      cfFetch(`/zones/${zoneId}/dns_records?proxied=true`, token),
-      cfFetch(`/accounts/${accountId}/cfd_tunnel`, token).catch(() => []),
+      cfFetch(`/zones/${zoneId}/dns_records?proxied=true&per_page=100`, token),
+      cfFetch(`/accounts/${accountId}/cfd_tunnel?is_deleted=false`, token).catch(() => []),
     ]);
 
     const dnsRecords = records.status === 'fulfilled' ? records.value : [];
     const tunnelList = tunnels.status === 'fulfilled' ? tunnels.value : [];
+
+    const tunnelById = {};
+    for (const t of tunnelList) {
+      tunnelById[t.id] = t;
+    }
 
     const proxiedSubdomains = dnsRecords.filter((r) => r.name !== 'derog.ch');
 
@@ -42,19 +60,43 @@ async function handleStatus(env) {
       proxiedSubdomains.map(async (rec) => {
         const subdomain = rec.name.replace('.derog.ch', '');
         const url = `https://${rec.name}/`;
-        const start = Date.now();
-        const headers = {};
-        if (accessId && accessSecret) {
-          headers['CF-Access-Client-Id'] = accessId;
-          headers['CF-Access-Client-Secret'] = accessSecret;
+
+        let tunnelId = null;
+        let tunnelStatus = null;
+        if (rec.content && rec.content.includes('.cfargotunnel.com')) {
+          tunnelId = rec.content.split('.')[0];
+          const tunnel = tunnelById[tunnelId];
+          if (tunnel) {
+            tunnelStatus = tunnel.status;
+          }
         }
+
+        let status = 'unknown';
+        let statusCode = null;
+        let latency = null;
+
         try {
-          const res = await fetch(url, { method: 'GET', headers, signal: AbortSignal.timeout(8000), redirect: 'manual' });
-          const status = res.status < 500 ? 'online' : 'offline';
-          return { name: rec.name, subdomain, url, type: rec.type, status, statusCode: res.status, latency: Date.now() - start, proxied: rec.proxied };
+          const start = Date.now();
+          const res = await fetch(url, { method: 'HEAD', signal: AbortSignal.timeout(8000), redirect: 'manual' });
+          statusCode = res.status;
+          latency = Date.now() - start;
+
+          if (tunnelStatus === 'healthy' || tunnelStatus === 'degraded') {
+            status = res.status < 500 ? 'online' : 'offline';
+          } else if (tunnelStatus === 'down' || tunnelStatus === 'inactive') {
+            status = 'offline';
+          } else {
+            status = res.status < 500 ? 'online' : 'offline';
+          }
         } catch {
-          return { name: rec.name, subdomain, url, type: rec.type, status: 'offline', statusCode: null, latency: null, proxied: rec.proxied };
+          if (tunnelStatus === 'healthy') {
+            status = 'degraded';
+          } else {
+            status = 'offline';
+          }
         }
+
+        return { name: rec.name, subdomain, url, type: rec.type, status, statusCode, latency, tunnelStatus, proxied: rec.proxied };
       })
     );
 
@@ -77,19 +119,3 @@ async function handleStatus(env) {
     });
   }
 }
-
-export default {
-  async fetch(request, env) {
-    const url = new URL(request.url);
-
-    if (url.pathname === '/api/status') {
-      return handleStatus(env);
-    }
-
-    if (!env.ASSETS) {
-      return new Response('Not Found', { status: 404 });
-    }
-
-    return env.ASSETS.fetch(request);
-  },
-};

@@ -49,6 +49,7 @@
     .status-dot.online { background: #22c55e; box-shadow: 0 0 12px rgba(34, 197, 94, 0.5); }
     .status-dot.offline { background: #ef4444; box-shadow: 0 0 12px rgba(239, 68, 68, 0.5); }
     .status-dot.checking { background: #eab308; box-shadow: 0 0 12px rgba(234, 179, 8, 0.5); }
+    .status-dot.degraded { background: #f97316; box-shadow: 0 0 12px rgba(249, 115, 22, 0.5); }
     .shimmer-text { background: linear-gradient(90deg, #a78bfa, #e879f9, #a78bfa); background-size: 200% auto; -webkit-background-clip: text; -webkit-text-fill-color: transparent; animation: shimmer 3s linear infinite; }
     .badge { background: linear-gradient(135deg, rgba(167, 139, 250, 0.15), rgba(232, 121, 249, 0.15)); border: 1px solid rgba(167, 139, 250, 0.3); backdrop-filter: blur(10px); }
     .service-icon { font-size: 1.5rem; }
@@ -165,12 +166,15 @@
           const dot = card.querySelector('[data-svc]');
           const latEl = card.querySelector('[data-latency]');
           if (dot) {
-            dot.className = `status-dot ${svc.status === 'online' ? 'online' : 'offline'}`;
+            dot.className = `status-dot ${svc.status === 'online' ? 'online' : svc.status === 'degraded' ? 'degraded' : 'offline'}`;
             dot.title = svc.status;
           }
           if (latEl) {
             if (svc.status === 'online' && svc.latency != null) {
               latEl.textContent = `${svc.latency}ms`;
+            } else if (svc.status === 'degraded') {
+              latEl.textContent = svc.tunnelStatus === 'down' ? 'tunnel down' : 'checking';
+              latEl.className = 'mt-2 text-xs text-orange-400/50';
             } else if (svc.status === 'offline') {
               latEl.textContent = 'unreachable';
               latEl.className = 'mt-2 text-xs text-red-400/50';
