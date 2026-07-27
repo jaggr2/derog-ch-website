@@ -1,28 +1,26 @@
-const API = 'https://api.cloudflare.com/client/v4';
+const CF_API = 'https://api.cloudflare.com/client/v4';
 
 async function cfFetch(path, token) {
-  const res = await fetch(`${API}${path}`, {
+  const res = await fetch(`${CF_API}${path}`, {
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
   });
-  if (!res.ok) throw new Error(`CF API ${res.status}: ${await res.text()}`);
+  if (!res.ok) throw new Error(`CF API ${res.status}`);
   const body = await res.json();
   if (!body.success) throw new Error(`CF API error: ${JSON.stringify(body.errors)}`);
   return body.result;
 }
 
-export async function onRequest(context) {
-  const { env, request } = context;
+async function handleStatus(env) {
   const token = env.CLOUDFLARE_API_TOKEN;
   if (!token) {
-    return new Response(JSON.stringify({ error: 'API token not configured' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+    return new Response(JSON.stringify({ error: 'API token not configured' }), {
+      status: 500, headers: { 'Content-Type': 'application/json' },
+    });
   }
 
-  const hostname = new URL(request.url).hostname;
-  const zoneName = hostname.split('.').slice(-2).join('.');
-
   try {
-    const zones = await cfFetch(`/zones?name=${zoneName}`, token);
-    if (!zones.length) throw new Error(`Zone ${zoneName} not found`);
+    const zones = await cfFetch(`/zones?name=derog.ch`, token);
+    if (!zones.length) throw new Error('Zone derog.ch not found');
     const zone = zones[0];
     const zoneId = zone.id;
     const accountId = zone.account.id;
@@ -35,34 +33,21 @@ export async function onRequest(context) {
     const dnsRecords = records.status === 'fulfilled' ? records.value : [];
     const tunnelList = tunnels.status === 'fulfilled' ? tunnels.value : [];
 
-    const tunnelNameMap = {};
-    for (const t of tunnelList) {
-      tunnelNameMap[t.id] = t.status;
-    }
-
     const serviceResults = await Promise.allSettled(
       dnsRecords.map(async (rec) => {
-        const subdomain = rec.name.replace(`.${zoneName}`, '');
+        const subdomain = rec.name.replace('.derog.ch', '');
         const url = `https://${rec.name}/`;
         const start = Date.now();
-        let reachable = false;
         try {
-          const res = await fetch(url, {
-            method: 'HEAD',
-            signal: AbortSignal.timeout(8000),
-            redirect: 'manual',
-          });
-          reachable = true;
-          const latency = Date.now() - start;
-          return { name: rec.name, subdomain: subdomain === zoneName ? '@' : subdomain, url, type: rec.type, status: 'online', latency, proxied: rec.proxied };
+          await fetch(url, { method: 'HEAD', signal: AbortSignal.timeout(8000), redirect: 'manual' });
+          return { name: rec.name, subdomain: subdomain || '@', url, type: rec.type, status: 'online', latency: Date.now() - start, proxied: rec.proxied };
         } catch {
-          return { name: rec.name, subdomain: subdomain === zoneName ? '@' : subdomain, url, type: rec.type, status: 'offline', latency: null, proxied: rec.proxied };
+          return { name: rec.name, subdomain: subdomain || '@', url, type: rec.type, status: 'offline', latency: null, proxied: rec.proxied };
         }
       })
     );
 
     const services = serviceResults.map((r) => (r.status === 'fulfilled' ? r.value : null)).filter(Boolean);
-
     const tunnelStatus = tunnelList.length > 0
       ? tunnelList.reduce((acc, t) => { acc[t.name] = t.status; return acc; }, {})
       : null;
@@ -81,3 +66,19 @@ export async function onRequest(context) {
     });
   }
 }
+
+export default {
+  async fetch(request, env) {
+    const url = new URL(request.url);
+
+    if (url.pathname === '/api/status') {
+      return handleStatus(env);
+    }
+
+    if (!env.ASSETS) {
+      return new Response('Not Found', { status: 404 });
+    }
+
+    return env.ASSETS.fetch(request);
+  },
+};
