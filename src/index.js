@@ -49,6 +49,9 @@ async function handleStatus(env) {
     const dnsRecords = records.status === 'fulfilled' ? records.value : [];
     const tunnelList = tunnels.status === 'fulfilled' ? tunnels.value : [];
 
+    const tunnelById = {};
+    for (const t of tunnelList) tunnelById[t.id] = t;
+
     const tunnelConfigs = await Promise.allSettled(
       tunnelList.map((t) =>
         cfFetch(`/accounts/${accountId}/cfd_tunnel/${t.id}/configurations`, token).catch(() => null)
@@ -58,11 +61,10 @@ async function handleStatus(env) {
     const hostnameToTunnelStatus = {};
     for (let i = 0; i < tunnelList.length; i++) {
       const cfg = tunnelConfigs[i];
-      if (cfg.status !== 'fulfilled' || !cfg.value) continue;
-      const ingress = cfg.value.ingress || [];
-      for (const rule of ingress) {
-        if (rule.hostname) {
-          hostnameToTunnelStatus[rule.hostname] = tunnelList[i].status;
+      if (cfg.status === 'fulfilled' && cfg.value) {
+        const ingress = cfg.value.ingress || [];
+        for (const rule of ingress) {
+          if (rule.hostname) hostnameToTunnelStatus[rule.hostname] = tunnelList[i].status;
         }
       }
     }
@@ -74,7 +76,12 @@ async function handleStatus(env) {
         const subdomain = rec.name.replace('.derog.ch', '');
         const url = `https://${rec.name}/`;
 
-        const tunnelStatus = hostnameToTunnelStatus[rec.name] || null;
+        let tunnelStatus = hostnameToTunnelStatus[rec.name] || null;
+        if (!tunnelStatus && rec.content && rec.content.includes('.cfargotunnel.com')) {
+          const tid = rec.content.split('.')[0];
+          const t = tunnelById[tid];
+          if (t) tunnelStatus = t.status;
+        }
 
         let status = 'unknown';
         let statusCode = null;
