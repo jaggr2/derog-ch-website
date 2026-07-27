@@ -70,14 +70,11 @@ async function handleStatus(env) {
           if (tunnel) tunnelStatus = tunnel.status;
         }
         if (!tunnelStatus) {
-          const keywords = { ha: 'hc', nas: 'nas', kvm: 'kvm' };
-          const kw = keywords[subdomain];
-          if (kw) {
-            for (const t of tunnelList) {
-              if (t.name.toLowerCase().includes(kw)) {
-                tunnelStatus = t.status;
-                break;
-              }
+          for (const t of tunnelList) {
+            const tn = t.name.toLowerCase();
+            if (tn.includes(subdomain) || subdomain.includes(tn.replace(/[^a-z]/g, '').slice(0, 3))) {
+              tunnelStatus = t.status;
+              break;
             }
           }
         }
