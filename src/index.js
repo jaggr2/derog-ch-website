@@ -1,5 +1,7 @@
 const CF_API = 'https://api.cloudflare.com/client/v4';
 
+let accessId = '', accessSecret = '';
+
 async function cfFetch(path, token) {
   const res = await fetch(`${CF_API}${path}`, {
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -26,6 +28,9 @@ async function handleStatus(env) {
       status: 500, headers: { 'Content-Type': 'application/json' },
     });
   }
+
+  accessId = env.CF_ACCESS_CLIENT_ID || '';
+  accessSecret = env.CF_ACCESS_CLIENT_SECRET || '';
 
   try {
     const zones = await cfFetch('/zones?name=derog.ch', token);
@@ -78,7 +83,12 @@ async function handleStatus(env) {
         let latency = null;
         try {
           const start = Date.now();
-          const res = await fetch(url, { method: 'HEAD', signal: AbortSignal.timeout(8000), redirect: 'manual' });
+          const headers = {};
+          if (accessId && accessSecret) {
+            headers['CF-Access-Client-Id'] = accessId;
+            headers['CF-Access-Client-Secret'] = accessSecret;
+          }
+          const res = await fetch(url, { method: 'HEAD', headers, signal: AbortSignal.timeout(8000), redirect: 'manual' });
           statusCode = res.status;
           latency = Date.now() - start;
           httpOk = res.status >= 200 && res.status <= 299;
