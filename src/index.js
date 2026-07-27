@@ -50,8 +50,10 @@ async function handleStatus(env) {
     const tunnelList = tunnels.status === 'fulfilled' ? tunnels.value : [];
 
     const tunnelById = {};
+    const tunnelByName = {};
     for (const t of tunnelList) {
       tunnelById[t.id] = t;
+      tunnelByName[t.name.toLowerCase()] = t;
     }
 
     const proxiedSubdomains = dnsRecords.filter((r) => r.name !== 'derog.ch');
@@ -61,13 +63,22 @@ async function handleStatus(env) {
         const subdomain = rec.name.replace('.derog.ch', '');
         const url = `https://${rec.name}/`;
 
-        let tunnelId = null;
         let tunnelStatus = null;
         if (rec.content && rec.content.includes('.cfargotunnel.com')) {
-          tunnelId = rec.content.split('.')[0];
-          const tunnel = tunnelById[tunnelId];
-          if (tunnel) {
-            tunnelStatus = tunnel.status;
+          const tid = rec.content.split('.')[0];
+          const tunnel = tunnelById[tid];
+          if (tunnel) tunnelStatus = tunnel.status;
+        }
+        if (!tunnelStatus) {
+          const keywords = { ha: 'hc', nas: 'nas', kvm: 'kvm' };
+          const kw = keywords[subdomain];
+          if (kw) {
+            for (const t of tunnelList) {
+              if (t.name.toLowerCase().includes(kw)) {
+                tunnelStatus = t.status;
+                break;
+              }
+            }
           }
         }
 
