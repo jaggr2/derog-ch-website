@@ -14,40 +14,10 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (url.pathname === '/api/status') return handleStatus(env);
-    if (url.pathname.startsWith('/api/admin/')) return handleAdmin(url, env);
     if (!env.ASSETS) return new Response('Not Found', { status: 404 });
     return env.ASSETS.fetch(request);
   },
 };
-
-async function handleAdmin(url, env) {
-  const token = env.CLOUDFLARE_API_TOKEN;
-  if (!token) return new Response('no token', { status: 500 });
-
-  const path = url.pathname.replace('/api/admin/', '');
-  try {
-    let data;
-    if (path === 'access-apps') {
-      data = await cfFetch('/accounts/d30b5030df689cb8099ae5d43a09b4fe/access/apps', token);
-    } else if (path.startsWith('access-app/')) {
-      const id = path.split('/')[1];
-      data = await cfFetch(`/accounts/d30b5030df689cb8099ae5d43a09b4fe/access/apps/${id}`, token);
-    } else if (path === 'dns') {
-      data = await cfFetch(`/zones?name=derog.ch`, token);
-      const zoneId = data[0]?.id;
-      data = await cfFetch(`/zones/${zoneId}/dns_records?name=kvm.derog.ch`, token);
-    } else if (path === 'idps') {
-      data = await cfFetch(`/accounts/d30b5030df689cb8099ae5d43a09b4fe/access/identity_providers`, token);
-    } else {
-      return new Response('unknown endpoint', { status: 404 });
-    }
-    return new Response(JSON.stringify(data, null, 2), {
-      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
-    });
-  } catch (err) {
-    return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: { 'Content-Type': 'application/json' } });
-  }
-}
 
 async function handleStatus(env) {
   const token = env.CLOUDFLARE_API_TOKEN;
