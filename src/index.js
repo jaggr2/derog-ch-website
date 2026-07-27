@@ -13,15 +13,8 @@ async function cfFetch(path, token) {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
-
-    if (url.pathname === '/api/status') {
-      return handleStatus(env);
-    }
-
-    if (!env.ASSETS) {
-      return new Response('Not Found', { status: 404 });
-    }
-
+    if (url.pathname === '/api/status') return handleStatus(env);
+    if (!env.ASSETS) return new Response('Not Found', { status: 404 });
     return env.ASSETS.fetch(request);
   },
 };
@@ -37,9 +30,8 @@ async function handleStatus(env) {
   try {
     const zones = await cfFetch('/zones?name=derog.ch', token);
     if (!zones.length) throw new Error('Zone derog.ch not found');
-    const zone = zones[0];
-    const zoneId = zone.id;
-    const accountId = zone.account.id;
+    const accountId = zones[0].account.id;
+    const zoneId = zones[0].id;
 
     const [records, tunnels] = await Promise.allSettled([
       cfFetch(`/zones/${zoneId}/dns_records?proxied=true&per_page=100`, token),
@@ -52,70 +44,64 @@ async function handleStatus(env) {
     const tunnelById = {};
     for (const t of tunnelList) tunnelById[t.id] = t;
 
-    const tunnelConfigs = await Promise.allSettled(
+    const hostnameToTunnel = {};
+    const configs = await Promise.allSettled(
       tunnelList.map((t) =>
         cfFetch(`/accounts/${accountId}/cfd_tunnel/${t.id}/configurations`, token).catch(() => null)
       )
     );
-
-    const hostnameToTunnelStatus = {};
     for (let i = 0; i < tunnelList.length; i++) {
-      const cfg = tunnelConfigs[i];
-      if (cfg.status === 'fulfilled' && cfg.value) {
-        const ingress = cfg.value.ingress || [];
-        for (const rule of ingress) {
-          if (rule.hostname) hostnameToTunnelStatus[rule.hostname] = tunnelList[i].status;
-        }
+      if (configs[i].status !== 'fulfilled' || !configs[i].value) continue;
+      for (const rule of configs[i].value.ingress || []) {
+        if (rule.hostname) hostnameToTunnel[rule.hostname] = tunnelList[i];
       }
     }
 
-    const proxiedSubdomains = dnsRecords.filter((r) => r.name !== 'derog.ch');
+    const proxied = dnsRecords.filter((r) => r.name !== 'derog.ch');
 
-    const serviceResults = await Promise.allSettled(
-      proxiedSubdomains.map(async (rec) => {
+    const results = await Promise.allSettled(
+      proxied.map(async (rec) => {
         const subdomain = rec.name.replace('.derog.ch', '');
         const url = `https://${rec.name}/`;
 
-        let tunnelStatus = hostnameToTunnelStatus[rec.name] || null;
-        if (!tunnelStatus && rec.content && rec.content.includes('.cfargotunnel.com')) {
-          const tid = rec.content.split('.')[0];
-          const t = tunnelById[tid];
-          if (t) tunnelStatus = t.status;
+        // 1. Look up tunnel via published routes
+        let tunnel = hostnameToTunnel[rec.name];
+        // 2. Fallback: extract tunnel ID from DNS CNAME target
+        if (!tunnel && rec.content?.includes('.cfargotunnel.com')) {
+          tunnel = tunnelById[rec.content.split('.')[0]] || null;
         }
+        const tunnelStatus = tunnel?.status || null;
 
-        let status = 'unknown';
+        // 3. HTTP probe to check actual service reachability
+        let httpOk = false;
         let statusCode = null;
         let latency = null;
-
         try {
           const start = Date.now();
           const res = await fetch(url, { method: 'HEAD', signal: AbortSignal.timeout(8000), redirect: 'manual' });
           statusCode = res.status;
           latency = Date.now() - start;
+          httpOk = res.status < 500;
+        } catch {}
 
-          if (tunnelStatus === 'healthy' || tunnelStatus === 'degraded') {
-            status = res.status < 500 ? 'online' : 'offline';
-          } else if (tunnelStatus === 'down' || tunnelStatus === 'inactive') {
-            status = 'offline';
-          } else {
-            status = res.status < 500 ? 'online' : 'offline';
-          }
-        } catch {
-          if (tunnelStatus === 'healthy') {
-            status = 'degraded';
-          } else {
-            status = 'offline';
-          }
+        // 4. Determine final status: tunnel state takes precedence, HTTP refines it
+        let status;
+        if (tunnelStatus === 'down' || tunnelStatus === 'inactive') {
+          status = 'offline';
+        } else if (!httpOk && tunnelStatus === 'healthy') {
+          status = 'degraded';
+        } else if (!httpOk) {
+          status = 'offline';
+        } else {
+          status = 'online';
         }
 
         return { name: rec.name, subdomain, url, type: rec.type, status, statusCode, latency, tunnelStatus, proxied: rec.proxied };
       })
     );
 
-    const services = serviceResults.map((r) => (r.status === 'fulfilled' ? r.value : null)).filter(Boolean);
-    const tunnelSummaries = tunnelList.length > 0
-      ? tunnelList.reduce((acc, t) => { acc[t.name] = t.status; return acc; }, {})
-      : null;
+    const services = results.map((r) => (r.status === 'fulfilled' ? r.value : null)).filter(Boolean);
+    const tunnelSummaries = tunnelList.reduce((acc, t) => { acc[t.name] = t.status; return acc; }, {});
 
     return new Response(JSON.stringify({ services, tunnels: tunnelSummaries, timestamp: new Date().toISOString() }), {
       headers: {

@@ -165,17 +165,19 @@
 
           const dot = card.querySelector('[data-svc]');
           const latEl = card.querySelector('[data-latency]');
+          const isOnline = svc.status === 'online';
+          const isDegraded = svc.status === 'degraded';
           if (dot) {
-            dot.className = `status-dot ${svc.status === 'online' ? 'online' : svc.status === 'degraded' ? 'degraded' : 'offline'}`;
+            dot.className = `status-dot ${isOnline ? 'online' : isDegraded ? 'degraded' : 'offline'}`;
             dot.title = svc.status;
           }
           if (latEl) {
-            if (svc.status === 'online' && svc.latency != null) {
+            if (isOnline && svc.latency != null) {
               latEl.textContent = `${svc.latency}ms`;
-            } else if (svc.status === 'degraded') {
-              latEl.textContent = svc.tunnelStatus === 'down' ? 'tunnel down' : 'checking';
+            } else if (isDegraded) {
+              latEl.textContent = svc.tunnelStatus === 'healthy' ? 'tunnel ok, service unreachable' : svc.tunnelStatus || 'unreachable';
               latEl.className = 'mt-2 text-xs text-orange-400/50';
-            } else if (svc.status === 'offline') {
+            } else {
               latEl.textContent = 'unreachable';
               latEl.className = 'mt-2 text-xs text-red-400/50';
             }
