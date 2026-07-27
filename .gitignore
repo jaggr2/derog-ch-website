@@ -4,3 +4,7 @@ node_modules/
 .env
 .playwright-mcp/
 .wrangler/
+
+.dev.vars*
+!.dev.vars.example
+!.env.example
